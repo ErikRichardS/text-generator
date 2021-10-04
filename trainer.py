@@ -19,10 +19,10 @@ def checkpoint_exists():
 	return isfile( checkpoint_path )
 
 
-def save_checkpoint(net, epochs_left, learning_rate, current_loss):
+def save_checkpoint(net, epoch, learning_rate, current_loss):
 	torch.save({
 				"model-state-dict" : net.state_dict(),
-				"epoch" : epochs_left,
+				"epoch" : epoch,
 				"learning-rate" : learning_rate,
 				"loss" : current_loss,
 			}, checkpoint_path )
@@ -47,7 +47,7 @@ def delete_checkpoint():
 # Trains a NN model. 
 # Returns 1 if it starting to overfit before all epochs are done
 # Returns 0 otherwise
-def train_model(net, dataset, start_fresh=False):
+def train_model(net, dataset_list, start_fresh=False):
 
 	# Hyper Parameters
 	num_epochs = hyperparameters["number-epochs"]
@@ -62,8 +62,11 @@ def train_model(net, dataset, start_fresh=False):
 	# Wrap the datasets in loaders that will handle the fetching of data and labels
 	# batch_size - How many datapoints is loaded each fetch.
 	# shuffle - Randomize the order loaded datapoints. 
-	loader = torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
-	
+	loader_list = []
+	for dataset in dataset_list:
+		loader_list.append(
+				torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=False)
+			)
 
 
 	# Loss calculates the error of the output
@@ -73,47 +76,49 @@ def train_model(net, dataset, start_fresh=False):
 
 
 	current_loss = float('inf')
+	epoch_start = 0
 
 	# Check if checkpoint of saved progress exists. 
 	# If it does, load and continue from saved checkpoint. 
 	if not start_fresh and checkpoint_exists():
 		print("Loading progress from last successful epoch...", end="\r")
-		net, num_epochs, learning_rate, current_loss = load_checkpoint(net)
+		net, epoch_start, learning_rate, current_loss = load_checkpoint(net)
 		optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 		print("Progress loaded. Continuing training from last successful epoch.")
 		print("Loss :\t %0.3f" % (current_loss))
 		print("Learning rate :\t %f" % (learning_rate))
-		print("Epochs left :\t %d" % (num_epochs))
+		print("Epochs left :\t %d" % (epoch_start))
 
 	
 	# Train the Model
 	print("Begin training...")
-	for epoch in range(num_epochs):
+	for epoch in range(epoch_start, num_epochs):
 		t1 = time()
 
 		loss_sum = 0
 
-		state_h, state_c = net.init_state(sequence_length)
+		for loader in loader_list:
+			state_h, state_c = net.init_state(sequence_length)
 
-		for i, (data, labels) in enumerate(loader):
-			# Load data into GPU using cuda
-			data = data.cuda()
-			labels = labels.cuda()
+			for i, (data, labels) in enumerate(loader):
+				# Load data into GPU using cuda
+				data = data.cuda()
+				labels = labels.cuda()
 
-			# Forward + Backward + Optimize
-			outputs, (state_h, state_c) = net(data, (state_h, state_c))
+				# Forward + Backward + Optimize
+				outputs, (state_h, state_c) = net(data, (state_h, state_c))
 
-			optimizer.zero_grad()
-			loss = criterion(outputs.transpose(1, 2), labels)
-			loss.backward()
-			optimizer.step()
+				optimizer.zero_grad()
+				loss = criterion(outputs.transpose(1, 2), labels)
+				loss.backward()
+				optimizer.step()
 
-			loss_sum += loss
+				loss_sum += loss
 
-			# Cut off backward in time pass to prevent memory overload
-			state_h = state_h.detach()
-			state_c = state_c.detach()
-			
+				# Cut off backward in time pass to prevent memory overload
+				state_h = state_h.detach()
+				state_c = state_c.detach()
+				
 				
 		t2 = time()
 			
@@ -132,9 +137,9 @@ def train_model(net, dataset, start_fresh=False):
 		print("Saving training progress...", end="\r")
 		save_checkpoint(
 				net=net, 
-				epochs_left=num_epochs-epoch-1, 
+				epoch=epoch, 
 				learning_rate=learning_rate, 
-				current_loss=current_loss
+				current_loss=current_loss 
 			)
 		print("Progress has been saved. Epoch %d of %d done." % (epoch+1, num_epochs))
 		print()

@@ -22,7 +22,7 @@ class RNN(nn.Module):
                             batch_first=False)
         
         self.decoder = nn.Sequential(
-            nn.Dropout(p = 0.25),
+            nn.Dropout(p = 0.2),
             nn.Linear(self.hidden_size, input_size)
             #nn.Softmax(dim=2)
         )

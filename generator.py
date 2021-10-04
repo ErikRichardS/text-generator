@@ -5,35 +5,44 @@ import random
 
 
 
-
 def copy_memory(memory):
 	return (
 			torch.clone(memory[0]), 
 			torch.clone(memory[1])
 		)
 
+def update_memory(net, memory, int2char, char2int, text):
+	for i in range(len(text)-1):
+		_, memory = generate_character(net, memory, int2char, char2int, text)
 
-def generate_text(net, int2char, char2int, vocabulary, text="Alice ", text_length=100):
+	return memory
+
+
+
+def generate_text(net, int2char, char2int, vocabulary, text="Alice ", paragraph_length=1000, paragraph_number=2):
 	if len(text) < 1:
 		raise ValueError("Starting text must have at least one character")
-	if text_length < 0:
+	if paragraph_length < 0 or paragraph_number < 0:
 		raise ValueError("Cannot generate a negative number of words")
 
 	# Update the memory with the starting text
 	memory = net.init_state(sequence_length=1)
-	for i in range(len(text)-1):
-		_, memory = generate_character(net, memory, int2char, char2int, text)
+	update_memory(net, memory, int2char, char2int, text)
 
 
-
-	for i in range(text_length):
-		while not text[-1].isalpha():
+	memory_original = copy_memory(memory)
+	text_full = ""
+	for p in range(paragraph_number):
+		for i in range(paragraph_length):
 			character, memory = generate_character(net, memory, int2char, char2int, text)
 			text = text + character
 
-		text, memory = generate_word(net, memory, int2char, char2int, vocabulary, text)
+		text_full += spell_check_text(text, vocabulary)
+		text = text_full
+		memory = update_memory(net, memory_original, int2char, char2int, text)
 
-	print(text)
+
+	print(text_full)
 
 
 def generate_text_raw(net, int2char, char2int, text="Alice ", text_length=1000):
@@ -66,39 +75,54 @@ def generate_character(net, memory, int2char, char2int, text):
 	return character, memory
 
 
-def generate_word(net, memory, int2char, char2int, vocabulary, text):
-	# Generate a word.
-	regex_word = "[a-zA-Z]+(-[a-zA-Z]+)?('[a-zA-Z]+)?$"
 
-	original_memory = copy_memory(memory)
+def spell_check_text(text, vocabulary):
+	tokens = text.split(" ")
 
-	word = text[-1]
-	is_capital = word.isupper()
-	while re.search(regex_word, word):
-		character, memory = generate_character(net, memory, int2char, char2int, word)
-		word = word + character
+	regex_word = "[a-zA-Z]+(-[a-zA-Z]+)?('[a-zA-Z]+)?"
 
-	# Check if the word is valid.
-	if word[:-1] not in vocabulary:
-		# Find the words closest to the mispelled word.
-		words = spell_correct_word(word[:-1], vocabulary)
-		word = random.choice(words) + word[-1]
+	corrected_text = ""
 
-		memory = copy_memory(original_memory)
+	for word in tokens:
+		if word == "":
+			continue
 
-		for i in range(1,len(word)):
-			_, memory = generate_character(net, memory, int2char, char2int, word[i])
+		elif word.lower() in vocabulary:
+			corrected_text += " "+word
+			continue
+		
+		match = re.search(regex_word, word)
 
-	if is_capital:
-		word = word[0].upper() + word[1:]
-
-	text = text[:-1] + word
-
-	
-
-	return text, memory
+		if match:
+			# Check if there's more in the token than the word.
+			# If so, extract them as prefixes and suffixes. 
+			beg_idx = match.start(0)
+			end_idx = match.end(0)
+			prefix = ""
+			suffix = ""
+			if end_idx < len(word):
+				suffix = word[end_idx:]
+			if beg_idx > 0:
+				prefix = word[:beg_idx]
 
 
+			# Check if the first letter is a capital letter. 
+			is_capital = word[0].isupper()
+
+			# Spell check to find possible words that are correct.
+			possible_words = spell_correct_word(match.group(0), vocabulary)
+
+			# Select a correct word at random. 
+			new_word = random.choice(possible_words)
+
+			if is_capital:
+				corrected_text += " "+prefix+new_word[0].upper()+new_word[1:]+suffix
+			else:
+				corrected_text += " "+prefix+new_word+suffix
+
+
+
+	return corrected_text
 
 
 def spell_correct_word(word_mispelled, vocabulary):
@@ -140,12 +164,3 @@ def spell_correct_word(word_mispelled, vocabulary):
 
 
 	return closest_words
-				
-
-"""
-  m e x t
-n 0 1 2 3
-e 1 1 2 3
-x 2 2 1 2
-t 3 3 2 1
-"""
