@@ -8,11 +8,11 @@ import math
 
 class RNN(nn.Module):      
     
-    def __init__(self, input_size):
+    def __init__(self, num_layers, hidden_size, input_size):
         super(RNN, self).__init__()
 
-        self.num_layers = 3
-        self.hidden_size = 128
+        self.num_layers = num_layers
+        self.hidden_size = hidden_size
 
         self.encoder = nn.Embedding(input_size, self.hidden_size, padding_idx=0)
 

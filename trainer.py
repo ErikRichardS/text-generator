@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader
 
 
 from time import time
+from random import shuffle, seed
 from os.path import isfile
 from os import remove
 from copy import deepcopy
@@ -75,7 +76,6 @@ def train_model(net, dataset_list, start_fresh=False):
 	optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
 
 
-	current_loss = float('inf')
 	epoch_start = 0
 
 	# Check if checkpoint of saved progress exists. 
@@ -87,8 +87,10 @@ def train_model(net, dataset_list, start_fresh=False):
 		print("Progress loaded. Continuing training from last successful epoch.")
 		print("Loss :\t %0.3f" % (current_loss))
 		print("Learning rate :\t %f" % (learning_rate))
-		print("Epochs left :\t %d" % (epoch_start))
+		print("Epochs done :\t %d" % (epoch_start))
 
+	# For randomizing the loader_list
+	seed(time())
 	
 	# Train the Model
 	print("Begin training...")
@@ -96,6 +98,8 @@ def train_model(net, dataset_list, start_fresh=False):
 		t1 = time()
 
 		loss_sum = 0
+
+		shuffle(loader_list)
 
 		for loader in loader_list:
 			state_h, state_c = net.init_state(sequence_length)
@@ -139,7 +143,7 @@ def train_model(net, dataset_list, start_fresh=False):
 				net=net, 
 				epoch=epoch, 
 				learning_rate=learning_rate, 
-				current_loss=current_loss 
+				current_loss=loss_sum
 			)
 		print("Progress has been saved. Epoch %d of %d done." % (epoch+1, num_epochs))
 		print()
