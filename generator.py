@@ -19,7 +19,7 @@ def update_memory(net, memory, int2char, char2int, text):
 
 
 
-def generate_text(net, int2char, char2int, vocabulary, text="Alice ", paragraph_length=1000, paragraph_number=2):
+def generate_text(net, int2char, char2int, vocabulary, text="V", paragraph_length=1000, paragraph_number=1):
 	if len(text) < 1:
 		raise ValueError("Starting text must have at least one character")
 	if paragraph_length < 0 or paragraph_number < 0:
@@ -45,7 +45,7 @@ def generate_text(net, int2char, char2int, vocabulary, text="Alice ", paragraph_
 	print(text_full)
 
 
-def generate_text_raw(net, int2char, char2int, text="Alice ", text_length=1000):
+def generate_text_raw(net, int2char, char2int, text="V", text_length=1000):
 	if len(text) < 1:
 		raise ValueError("Starting text must have at least one character")
 	if text_length < 0:
@@ -136,24 +136,43 @@ def spell_correct_word(word_mispelled, vocabulary):
 	distance_matrix[0,:] = torch.tensor( range(50) )
 
 	for word_correct in vocabulary:
-		# If the words have no letters in common, skip
-		if not re.search("["+word_mispelled+"]", word_correct):
+		# If the words have no letters in common, 
+		# or the length difference is smaller than 
+		# the smallest distance so far,
+		# skip
+		length_difference = abs(len(word_mispelled) - len(word_correct))
+		if length_difference > smallest_distance:
 			continue
 
-		# Build the distance matrix
-		for i in range(1,len(word_mispelled)):
-			for j in range(1,len(word_correct)):
-				change = distance_matrix[i-1, j-1].item()
-				if word_mispelled[i-1] != word_correct[j-1]:
-					change += 1
+		# Edge case if a word is one character long:
+		if len(word_correct) == 1 or len(word_mispelled) == 1:
+			if word_mispelled == word_correct:
+				smallest_distance = 0
+				closest_words.append[word_correct]
+			elif word_correct in word_mispelled or word_mispelled in word_correct:
+				distance = length_difference
 
-				remove = distance_matrix[i-1, j].item() + 1
-				add = distance_matrix[i, j-1].item() + 1
+		else:
+			# Build the distance matrix
+			for i in range(1,len(word_mispelled)):
+				for j in range(1,len(word_correct)):
+					change = distance_matrix[i-1, j-1].item()
+					if word_mispelled[i-1] != word_correct[j-1]:
+						change += 1
 
-				distance_matrix[i,j] = min([change, remove, add])
+					remove = distance_matrix[i-1, j].item() + 1
+					add = distance_matrix[i, j-1].item() + 1
 
-		# See if the distance is small enough
-		distance = distance_matrix[-1, len(word_correct)-1].item()
+					distance_matrix[i,j] = min([change, remove, add])
+
+				if distance_matrix[i, len(word_correct)-1] > smallest_distance:
+					distance_matrix[-1, len(word_correct)-1] = 100
+					break;
+
+			# See if the distance is small enough
+			distance = distance_matrix[-1, len(word_correct)-1].item()
+
+
 		if distance < smallest_distance:
 			closest_words = [word_correct]
 			smallest_distance = distance
@@ -164,3 +183,5 @@ def spell_correct_word(word_mispelled, vocabulary):
 
 
 	return closest_words
+
+	

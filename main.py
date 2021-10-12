@@ -19,19 +19,31 @@ from settings import hyperparameters
 
 network_name = input("Please enter a network name:\n>")
 
-json_file = network_name+"-encoder.json"
-#save_meta_files(json_file)
-int2char, char2int, vocabulary = load_meta_files(json_file)
+start_anew = None
+while start_anew == None:
+	start_anew = input("Start fresh? y/n\n>")
 
+	if start_anew == "y":
+		start_anew = True
+	elif start_anew == "n":
+		start_anew = False
+	else:
+		start_anew = None
+
+
+json_file = network_name+"-encoder.json"
+save_meta_files(json_file)
+int2char, char2int, vocabulary = load_meta_files(json_file)
 
 dataset_list = get_datasets(char2int, sequence_length=hyperparameters["sequence-length"])
 
 
-net = RNN(num_layers=5, hidden_size=256, input_size=len(int2char))
-net = train_model(net, dataset_list, start_fresh=False)
+net = RNN(num_layers=4, hidden_size=128, input_size=len(int2char))
+net = train_model(net, dataset_list, start_fresh=start_anew)
 torch.save(net, network_name+"-net.pt")
 
 
-#net = torch.load(network_name+"-net.pt")
+net = torch.load(network_name+"-net.pt")
+
 
 generate_text(net, int2char, char2int, vocabulary)
