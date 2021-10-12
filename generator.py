@@ -144,11 +144,12 @@ def spell_correct_word(word_mispelled, vocabulary):
 		if length_difference > smallest_distance:
 			continue
 
+		distance = 0
 		# Edge case if a word is one character long:
 		if len(word_correct) == 1 or len(word_mispelled) == 1:
 			if word_mispelled == word_correct:
 				smallest_distance = 0
-				closest_words.append[word_correct]
+				closest_words = [word_correct]
 			elif word_correct in word_mispelled or word_mispelled in word_correct:
 				distance = length_difference
 
